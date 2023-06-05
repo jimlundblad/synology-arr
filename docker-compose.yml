@@ -1,0 +1,285 @@
+version: "3.9"
+
+networks:
+  synology-media:
+    driver: bridge
+
+services:
+  Portainer:
+    image: portainer/portainer
+    container_name: portainer
+    hostname: portainer
+    ports:
+      - 9000:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /volume1/docker/portainer:/data
+    environment:
+      - PUID=1028
+      - PGID=100
+      - TZ=Europe/London
+    networks:
+      - synology-media
+    # network_mode: service:protonwire
+    restart: unless-stopped
+
+  PgSQL:
+    image: postgres:14
+    container_name: PgSQL
+    hostname: pgsql
+    ports:
+      - 5433:5432/tcp
+    environment:
+      - PUID=1028
+      - PGID=100
+      - TZ=Europe/London
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_MULTIPLE_DATABASES=radarr-main,radarr-log,sonarr-main,sonarr-log
+    volumes:
+      - /volume1/docker/pgsql/create-multiple-postgresql-databases.sh:/docker-entrypoint-initdb.d//initdb.sh
+      - /volume1/docker/pgsql/data:/var/lib/postgresql/data
+    networks:
+      - synology-media
+    restart: unless-stopped
+
+  Plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: Plex
+    hostname: plex
+    environment:
+      - PUID=1028
+      - PGID=100
+      # - PLEX_UID=1028
+      # - PLEX_GID=100
+      - ALLOWED_NETWORKS=192.168.178.0/24,172.18.0.0/16
+      - CHANGE_CONFIG_DIR_OWNERSHIP=false
+      - TZ=Europe/London
+      - VERSION=latest
+      - PLEX_DOWNLOAD=https://downloads.plex.tv/plex-media-server-new
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+    devices:
+      - /dev/dri:/dev/dri
+    ports:
+      - 3240:32400/tcp
+      # - 3005:3005
+      # - 8324:8324
+      # - 1900:1900/udp
+      # - 32410:32410/udp
+      # - 32412:32412/udp
+      # - 32413:32413/udp
+      # - 32414:32414/udp
+      # - 32469:32469/udp
+      # - 5353:5353/udp  
+    volumes:
+      - /volume1/docker/plex:/config/
+      - /volume1/Media:/data
+      - /volume1/docker/transcode:/transcode
+    restart: unless-stopped
+    networks:
+      - synology-media
+
+  # Jellyfin:
+  #   image: linuxserver/jellyfin:latest
+  #   container_name: Jellyfin
+  #   hostname: jellyfin
+  #   environment:
+  #     - PUID=1028
+  #     - PGID=100
+  #     - TZ=Europe/London
+  #   volumes:
+  #     - /volume1/docker/jellyfin:/config
+  #     - /volume1/Media:/media
+  #   ports:
+  #     - 8096:8096
+  #     - 8920:8920
+  #   restart: unless-stopped
+  #   networks:
+  #     - synology-media
+  #   # network_mode: service:protonwire
+
+  Sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: Sonarr
+    hostname: sonarr
+    environment:
+      - PUID=1028
+      - PGID=100
+      - TZ=Europe/London
+    volumes:
+      - /volume1/docker/sonarr:/config
+      - /volume1/downloads:/downloads
+      - /volume1/Media:/media
+    ports:
+      - 8989:8989
+    networks:
+      - synology-media
+    # network_mode: service:protonwire
+    restart: unless-stopped
+
+  Radarr:
+    image: linuxserver/radarr:latest
+    container_name: Radarr
+    hostname: radarr
+    environment:
+      - PUID=1028
+      - PGID=100
+      - TZ=Europe/London
+    volumes:
+      - /volume1/docker/radarr:/config
+      - /volume1/downloads:/downloads
+      - /volume1/Media:/media
+    ports:
+      - 7878:7878
+    networks:
+      - synology-media
+    restart: unless-stopped
+
+  Jacket:
+    image: linuxserver/jackett:latest
+    container_name: Jacket
+    hostname: jackett
+    environment:
+      - PUID=1028
+      - PGID=100
+      - TZ=Europe/London
+    volumes:
+      - /volume1/docker/jackett:/config
+      - /volume1/downloads:/downloads
+      - /volume1/Media:/media
+    ports:
+      - 9117:9117
+    networks:
+      - synology-media
+    # network_mode: service:protonwire
+    restart: unless-stopped
+
+  Qbittorrent:
+    image: linuxserver/qbittorrent:latest
+    container_name: Qbittorrent
+    hostname: qbittorrent
+    environment:
+      - PUID=1028
+      - PGID=100
+      - TZ=Europe/London
+    volumes:
+      - /volume1/docker/qbittorrent:/config
+      - /volume1/downloads:/downloads
+      - /volume1/Media:/media
+      - /volume1/torrents:/torrents
+    ports:
+      - 8080:8080
+      - 6881:6881
+      - 6881:6881/udp
+    networks:
+      - synology-media
+    # network_mode: service:protonwire
+    restart: unless-stopped
+
+  # Nzbget:
+  #   image: linuxserver/nzbget:latest
+  #   container_name: Nzbget
+  #   hostname: nzbget
+  #   environment:
+  #     - PUID=1028
+  #     - PGID=100
+  #     - TZ=Europe/London
+  #     # - USER=nzbget
+  #     # - PASS=tegbzn6789
+  #   volumes:
+  #     - /volume1/docker/nzbget:/config
+  #     - /volume1/downloads:/downloads
+  #     - /volume1/Media:/media
+  #   ports:
+  #     - 6789:6789
+  #     - 6789:6789/udp
+  #   networks:
+  #     - synology-media
+  #   # network_mode: service:protonwire
+  #   restart: unless-stopped
+
+  Tdarr:
+    image: ghcr.io/haveagitgat/tdarr:latest
+    container_name: Tdarr
+    # hostname: tdarr
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://192.168.178.68:8265/ || exit 1
+    ports:
+      - 8265:8265
+      - 8266:8266
+    environment:
+      - PUID=1028
+      - PGID=100
+      - TZ=Europe/London
+      - serverIP=tdarr
+      - serverPort=8266
+      - webUIPort=8265
+      - internalNode=true
+      - nodeID=InternalNode
+    volumes:
+      - /volume1/docker/tdarr/server:/app/server
+      - /volume1/docker/tdarr/configs:/app/configs
+      - /volume1/docker/tdarr/logs:/app/logs
+      # - /volume1/docker/tdarr/media:/media
+      - /volume1/docker/tdarr/temp:/temp
+      - /volume1/downloads:/downloads
+      - /volume1/Media:/media
+    networks:
+      - synology-media
+    # network_mode: service:protonwire
+    restart: unless-stopped
+
+  # Openaudible:
+  #   image: openaudible/openaudible:latest
+  #   container_name: Openaudible
+  #   hostname: openaudible
+  #   ports:
+  #     - 3000:3000
+  #   environment:
+  #     - PUID=1028
+  #     - PGID=100
+  #   volumes:
+  #     - /volume1/Media:/media
+  #     - /volume1/docker/openaudible:/config
+  #   networks:
+  #     - synology-media
+  #   restart: unless-stopped
+
+  # protonwire:
+  #   container_name: protonwire
+  #   # Use semver tags or sha256 hashes of manifests.
+  #   # using latest tag can lead to issues when used with
+  #   # automatic image updaters like watchtower.
+  #   image: ghcr.io/tprasadtp/protonwire:latest
+  #   init: true
+  #   restart: unless-stopped
+  #   environment:
+  #     # Quote this value as server name can contain '#'.
+  #     PROTONVPN_SERVER: "nl-free-133138.protonvpn.net"
+  #     # Set this to 1 to show debug logs for issue forms.
+  #     DEBUG: "1"
+  #     # Set this to 1 to enable kill-switch.
+  #     KILL_SWITCH: "1"
+  #   # NET_ADMIN capability is mandatory!
+  #   cap_add:
+  #     - NET_ADMIN
+  #   # sysctl net.ipv4.conf.all.rp_filter is mandatory!
+  #   # net.ipv6.conf.all.disable_ipv6 disables IPv6 as protonVPN does not support IPv6.
+  #   # 'net.*' sysctls are not required on application containers,
+  #   # as they share network stack with protonwire container.
+  #   sysctls:
+  #     net.ipv4.conf.all.rp_filter: 2
+  #     net.ipv6.conf.all.disable_ipv6: 1
+  #   volumes:
+  #     - type: tmpfs
+  #       target: /tmp
+  #     - type: bind
+  #       source: /volume1/docker/protonwire/private.key
+  #       target: /etc/protonwire/private-key
+  #       read_only: true
+  #   ports:
+  #     - 8000:80
+  #   networks:
+  #     - synology-media
